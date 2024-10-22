@@ -38,16 +38,18 @@ voting_classifier_model = load_model('voting_clf_model.pkl')
 
 xgboost_SMOTE_model = load_model('xgboost-SMOTE_model.pkl')
 
+gbc_model = load_model('gbc_model.pkl')
+
 xgboost_featureEngineered_model = load_model('xgboost-featureEngineered_model.pkl')
 
 # Prepare the input data for the functions
-def prepare_input(credit_score, location, gender, age, tenure, balance, num_products, has_credit_card, is_active_member, estimated_salary):
+def prepare_input(credit_score, location, gender, age, tenure, balance, num_products, has_credit_card, is_active_member, estimated_salary, ):
   input_dict = {
     'CreditScore': credit_score,
     'Age': age,
     'Tenure': tenure,
     'Balance': balance,
-    'NumofProducts': num_products,
+    'NumOfProducts': num_products,
     'HasCrCard': has_credit_card,
     'IsActiveMember': int(is_active_member),
     'EstimatedSalary': estimated_salary,
@@ -55,7 +57,12 @@ def prepare_input(credit_score, location, gender, age, tenure, balance, num_prod
     'Geography_Germany': 1 if location == 'Germany' else 0,
     'Geography_Spain' : 1 if location == 'Spain' else 0,
     'Gender_Male': 1 if gender == 'Male' else 0,
-    'Gender_Female': 1 if gender == 'Female' else 0
+    'Gender_Female': 1 if gender == 'Female' else 0,
+    # 'CLV' : (balance * estimated_salary)/100000,
+    # 'TenureAgeRatio': tenure/age,
+    # 'AgeGroup_MiddleAge': 1 if (age >= 30 and age<45) else 0,
+    # 'AgeGroup_Senior': 1 if (age >= 45 and age<60) else 0,
+    # 'AgeGroup_Elderly': 1 if (age >= 60 and age< 100) else 0
   }
 
   input_df = pd.DataFrame([input_dict])
@@ -66,7 +73,9 @@ def make_predictions(input_df, input_dict):
   probabilities = {
     'XGBoost' : xgboost_model.predict_proba(input_df)[0][1],
     'Random Forest': random_forest_model.predict_proba(input_df)[0][1],
-    'K-Nearest Neighbors': knn_model.predict_proba(input_df)[0][1]
+    'K-Nearest Neighbors': knn_model.predict_proba(input_df)[0][1],
+    # 'Voting Classifiers': voting_classifier_model.predict_proba(input_df)[0][1],
+    # 'Gradient Boosting Classifier': gbc_model.predict_proba(input_df)[0][1]
   }
 
   avg_probability = np.mean(list(probabilities.values()))
@@ -84,10 +93,10 @@ def make_predictions(input_df, input_dict):
     fig_probs = ut.create_model_probability_chart(probabilities)
     st.plotly_chart(fig_probs, use_container_width=True)
 
-  st.markdown("### Model Probabilities")
+  st.markdown("### Model Probabilities by %")
   for model, prob in probabilities.items():
-    st.write(f"{model} : {prob}")
-  st.write(f"Average Probability: {avg_probability}")  
+    st.write(f"{model} : {prob * 100:.2f}%")
+  st.write(f"Average Probability: {avg_probability * 100:.2f}%")  
 
   return avg_probability
 
@@ -128,15 +137,15 @@ def explain_prediction(probability, input_dict, surname):
 
   - If the customer has over a 40% risk of churning, generate 3 sentences explaining why they are at a risk of churning.
   - If the customer has less than a 40% risk of churning, generate 3 sentences explaining why they might not be at a risk of churning.
-  - Just give an explanation in words using the customer's information, the summary statistics of churned and not churned customers, and the feature importances provided.
+  - Just give an explanation using the customer's information, the summary statistics of churned and not churned customers, and the feature importances provided.
 
 Don't ever mention the probability of churning or the machine learning model, or say anything like "Based on the machine learning model's prediction and top 10 most importance features", just explain the prediction.
-Don't mention any info about columns in the dataframe. """
+ """
   
   print("EXPLANATION PROMPT", prompt)
 
   raw_response = client.chat.completions.create(
-    model = "llama-3.2-3b-preview",
+    model = "llama-3.1-70b-versatile",
     messages = [{
       'role':'user',
       'content': prompt
@@ -162,7 +171,7 @@ def generate_email(probability, input_dict, explanation, surname):
   """
 
   raw_response = client.chat.completions.create(
-    model = "llama-3.2-3b-preview",
+    model = "llama-3.1-70b-versatile",
     messages = [{
       "role":"user",
       "content":prompt
@@ -261,21 +270,24 @@ if selected_customer_option:
       value = float(selected_customer['EstimatedSalary'])
     )
 
-  input_df, input_dict = prepare_input(credit_score, location, gender, age, tenure, balance, num_products, has_credit_card, is_active_member, estimated_salary)
-  avg_probability = make_predictions(input_df, input_dict)
-
-  explanation = explain_prediction(avg_probability, input_dict, selected_customer['Surname'])
-
-  st.markdown("---")
-  st.subheader("Explanation of Prediction")
-  st.markdown(explanation)
-
-  email = generate_email(avg_probability, input_dict, explanation, selected_customer['Surname'])
-
-  st.markdown("---")
-  st.subheader("Personalized Email")
-  st.markdown(email)
-  
+  if st.button("Predict Churn!"):
+      input_df, input_dict = prepare_input(credit_score, location, gender, age, tenure, balance, num_products, has_credit_card, is_active_member, estimated_salary)
+      
+      
+      avg_probability = make_predictions(input_df, input_dict)
+    
+      explanation = explain_prediction(avg_probability, input_dict, selected_customer['Surname'])
+    
+      st.markdown("---")
+      st.subheader("Explanation of Prediction")
+      st.markdown(explanation)
+    
+      email = generate_email(avg_probability, input_dict, explanation, selected_customer['Surname'])
+    
+      st.markdown("---")
+      st.subheader("Personalized Email")
+      st.markdown(email)
+      
                               
   
 
