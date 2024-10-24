@@ -77,7 +77,7 @@ def make_predictions(input_df, input_dict):
     # 'Voting Classifiers': voting_classifier_model.predict_proba(input_df)[0][1],
     # 'Gradient Boosting Classifier': gbc_model.predict_proba(input_df)[0][1]
   }
-
+  
   avg_probability = np.mean(list(probabilities.values()))
 
   col1, col2 = st.columns(2)
